@@ -159,7 +159,8 @@ const randomColor = () => {
 // routes
 app.get('/', (req, res) => {
     res.render('home', {
-        title: 'Home'
+        title: 'Home',
+        userInfo: req.session.userInfo
     });
 })
 
@@ -183,7 +184,6 @@ app.get('/profile', isAuth, (req, res) => {
 })
 
 app.post('/logout', (req, res) => {
-    console.log(req.session.userInfo)
     req.session.destroy((err) => {
         if (err) throw err;
         res.redirect('/')
@@ -200,4 +200,15 @@ app.post('/loginForm', passport.authenticate('login', {
     failureRedirect: '/login'
 }), (req, res) => {
     res.redirect('/profile')
+})
+
+app.post('/color',async (req, res) => {
+    await User.findOneAndUpdate({
+        username: req.session.userInfo.username
+    }, {
+        $set: {
+            userColor: req.body.color
+        }
+    })
+    req.session.userInfo.userColor = req.body.color;
 })
