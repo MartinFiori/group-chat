@@ -81,26 +81,7 @@ passport.deserializeUser((id, done) => {
     })
 })
 
-// Setting passport Strategy
-// passport.use('signup', new LocalStrategy({
-//     passReqToCallback: true
-// }, (req, email, password, done) => {
-//     User.findOne({
-//         email: email
-//     }, (err, user) => {
-//         if (err) return done(err)
-//         const newUser = {
-//             username: req.body.username,
-//             email: email,
-//             password: createHash(password)
-//         }
-//         User.create(newUser, (err, userCreated => {
-//             if (err) return done(err);
-//             return done(null, userCreated)
-//         }))
-//     })
-// }))
-
+// Sign up validation with passport
 passport.use('signup', new LocalStrategy({
     passReqToCallback: true
 }, (req, username, password, done) => {
@@ -114,10 +95,10 @@ passport.use('signup', new LocalStrategy({
         const newUser = {
             username: username,
             name: req.body.name,
-            accountCreated: m().format('HH:mm:ssA DD/MM/YYY'),
+            accountCreated: m().format('HH:mm:ssA DD/MM/YYYY'),
             password: createHash(password),
             userColor: randomColor(),
-            connection:true
+            connection: true
         }
         User.create(newUser, (err, userCreated) => {
             if (err) return done(err);
@@ -126,10 +107,44 @@ passport.use('signup', new LocalStrategy({
     })
 }))
 
+// Log in validation with passport
+passport.use('login', new LocalStrategy({
+    passReqToCallback: true
+}, (req, username, password, done) => {
+    User.findOne({
+        username: username
+    }, (err, user) => {
+        if (err) return done(err);
+        if (user) {
+            if (!bcrypt.compareSync(password, user.password)) {
+                console.log('Wrong password');
+            } else {
+                req.session.userInfo = user;
+                return done(null, user)
+            }
+        } else {
+            return done(null, {
+                message: 'No user found'
+            });
+        }
+    })
+}))
+
+// Encrypting the password
 const createHash = (pw) => {
     return bcrypt.hashSync(pw, bcrypt.genSaltSync(10))
 }
 
+// User's authentication
+const isAuth = (req, res, next) => {
+    if (req.session.userInfo) {
+        next();
+    } else {
+        res.redirect('/login');
+    }
+}
+
+// Generates a random color(for the chat's color)
 const randomColor = () => {
     const color = Math.floor(Math.random() * 16777215).toString(16);
     const randomColor = '#' + color;
@@ -140,7 +155,6 @@ const randomColor = () => {
 // io.on('connection', () => {
 //     console.log('New user connected 😋')
 // })
-
 
 // routes
 app.get('/', (req, res) => {
@@ -161,8 +175,29 @@ app.get('/login', (req, res) => {
     })
 })
 
+app.get('/profile', isAuth, (req, res) => {
+    res.render('profile', {
+        title: 'Profile',
+        user: req.session.userInfo
+    })
+})
+
+app.post('/logout', (req, res) => {
+    console.log(req.session.userInfo)
+    req.session.destroy((err) => {
+        if (err) throw err;
+        res.redirect('/')
+    })
+})
+
 app.post('/signupForm', passport.authenticate('signup', {
     failureRedirect: '/signup'
 }), (req, res) => {
     res.redirect('/login')
+})
+
+app.post('/loginForm', passport.authenticate('login', {
+    failureRedirect: '/login'
+}), (req, res) => {
+    res.redirect('/profile')
 })
